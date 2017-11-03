@@ -48,3 +48,63 @@ type Query struct {
 	Radius       int
 	CostRangeStr string
 }
+
+// google Place APIへのリクエストを作成し、レスポンスをjsonに加工して返す
+func (q *Query) find(types string) (*googleResponse, error) {
+	u := "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+	vals := make(url.Values)
+	vals.Set("location", fmt.Sprintf("%g %g", q.Lat, g.Lng))
+	vals.Set("radius", fmt.Sprintf("%d", q.Radius))
+	vals.Set("types", types)
+	vals.Set("key", APIKey)
+	if len(q.CostRangeStr) > 0 {
+		r := ParseCostRange(q.CostRangeStr)
+		vals.Set("minprice", fmt.Sprintf("%d", int(r.From)-1))
+		vals.Set("maxprice", fmt.Sprintf("%d", int(r.To)-1))
+	}
+	res, err := http.Get(u + "?" + vals.Encode())
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	var response googleResponse
+	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
+		return nil, err
+	}
+	return &response, nil
+}
+
+func (q *Query) Run() []interface{} {
+	rand.Seed(time.Now().UnixNano()) // 毎回違う乱数が生成される
+	var w sync.WaitGroup
+	var l sync.Mutex
+	places := make([]interface{}, len(q.Journey))
+	for i, r := range q.Journey {
+		w.Add(1)
+		go func(types string, i int) {
+			defer w.Done() // 場所のランダム選択の完了を宣言
+			response, err := q.find(types)
+			if err != nil {
+				log.Println("施設の検索に失敗しました：", err)
+				return
+			}
+			if len(response.Results) == 0 {
+				log.Pringln("施設が見つかりませんでした：", types)
+				return
+			}
+			for _, result := range response.Results {
+				for _, photo := range result.Photos {
+					photo.URL = "https://maps.googleapis.com/maps/api/place/photo?" +
+						"maxwidth=1000&photoreference=" + photo.PhotoRef +
+						"&key=" + APIKey
+				}
+			}
+			randI := rand.Intn(len(response.Results))
+			l.Lock()
+			places[i] = response.Results[randI] // ランダムにレスポンス結果をplacesに保持
+			l.UnLock()
+		}(r, i)
+	}
+	w.Wait() // すべてのリクエストの完了を待つ
+	return places
+}
