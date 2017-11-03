@@ -1,5 +1,7 @@
 package meander
 
+import "strings"
+
 type Cost int8
 
 // Cost型のenumを作成
@@ -34,4 +36,25 @@ func (l Cost) String() string {
 // 文字列から対応するコスト（数値）を返す
 func ParseCost(s string) Cost {
 	return costStrings[s]
+}
+
+// コストの下限と上限を定義する
+type CostRange struct {
+	From Cost
+	To   Cost
+}
+
+// 文字列からCostRange型に変換
+// 入力値の例）"$...$$$"
+func ParseCostRange(s string) *CostRange {
+	segs := strings.Split(s, "...")
+	return &CostRange{
+		From: costStrings[segs[0]],
+		To:   costStrings[segs[1]],
+	}
+}
+
+// CostRange型から文字列に変換する
+func (c CostRange) String() string {
+	return c.From.String() + "..." + c.To.String()
 }

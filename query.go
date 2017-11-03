@@ -28,6 +28,7 @@ type googlePhoto struct {
 	URL      string `json:"url"`
 }
 
+// 構造体を外部に公開するためのメソッド
 func (p *Place) Public() interface{} {
 	return map[string]interface{}{
 		"name":     p.Name,
@@ -37,4 +38,13 @@ func (p *Place) Public() interface{} {
 		"lat":      p.Lat,
 		"lng":      p.Lng,
 	}
+}
+
+// Google Place APIにデータを送信する際のフォーマットを定義
+type Query struct {
+	Lat          float64
+	Lng          float64
+	Journey      []string
+	Radius       int
+	CostRangeStr string
 }
